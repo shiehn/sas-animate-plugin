@@ -68,20 +68,36 @@ export function AnimatePanel(props: PluginUIProps): React.ReactElement {
   /** Optimistic per-animation overrides, cleared as host state confirms. */
   const [pending, setPending] = useState<Record<string, AnimationSpec>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   const reload = useCallback(async (): Promise<void> => {
     if (!activeSceneId || !supported) return;
-    try {
-      const [nextState, sceneTracks] = await Promise.all([
-        host.getAnimateState!(activeSceneId),
-        host.listSceneTracks ? host.listSceneTracks() : Promise.resolve([]),
-      ]);
-      setState(nextState);
-      setTracks(sceneTracks);
-    } catch (err) {
-      console.warn('[AnimatePanel] reload failed:', err);
+    // Settle independently — a failing animate read must not blank the track
+    // picker (and vice versa), and the failure must be VISIBLE, not a
+    // misleading empty state.
+    const [stateResult, tracksResult] = await Promise.allSettled([
+      host.getAnimateState!(activeSceneId),
+      host.listSceneTracks ? host.listSceneTracks() : Promise.resolve([]),
+    ]);
+    if (stateResult.status === 'fulfilled') {
+      setState(stateResult.value);
+      setLoadError(null);
+    } else {
+      const message =
+        stateResult.reason instanceof Error ? stateResult.reason.message : String(stateResult.reason);
+      console.warn('[AnimatePanel] reload failed:', stateResult.reason);
+      setLoadError(
+        message.includes('No active PluginHost')
+          ? 'The Animate host is not active — restart the app so the main process picks the plugin up.'
+          : message
+      );
+    }
+    if (tracksResult.status === 'fulfilled') {
+      setTracks(tracksResult.value);
+    } else {
+      console.warn('[AnimatePanel] listSceneTracks failed:', tracksResult.reason);
     }
   }, [host, activeSceneId, supported]);
 
@@ -205,7 +221,8 @@ export function AnimatePanel(props: PluginUIProps): React.ReactElement {
 
   return (
     <div style={styles.panel} data-testid="animate-panel">
-      {cards.length === 0 && !menuOpen && (
+      {loadError && <div style={styles.errorBar}>{loadError}</div>}
+      {cards.length === 0 && !menuOpen && !loadError && (
         <div style={styles.emptyState}>
           No animations yet — add a pump, autopan, gate, fade, filter sweep, or duck.
         </div>
