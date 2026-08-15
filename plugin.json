@@ -5,7 +5,7 @@
   "description": "Automation control panel: pick an animation (pumper, autopan, tremolo, trance gate, fade in/out, DJ filter sweep, riser, duck and other listen-driven moves, plus an experimental Lab), choose target tracks, set rate/depth/shape — the panel drives volume, pan, and filter motion on any tracks in the scene through declarative engine configs that render identically live and offline.",
   "generatorType": "hybrid",
   "main": "index.js",
-  "minHostVersion": "2.64.0",
+  "minHostVersion": "3.0.0",
   "builtIn": true,
   "supportedTimeSignatures": "*",
   "capabilities": {
